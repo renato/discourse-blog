@@ -95,6 +95,15 @@ RSpec.describe DiscourseBlog::TemplateRenderer do
       expect(described_class.render("about", { "count" => 2 }, theme: theme)).to eq("xx")
     end
 
+    it "keeps the cached template untouched by a failing render" do
+      source = "{% for item in (1..count) %}x{% endfor %}"
+      theme = { "template_article" => source }
+      expect(
+        described_class.render("article", { "count" => 100_000 }, theme: theme, diagnostics: true),
+      ).to include("data-template-diagnostic")
+      expect(described_class::TEMPLATES[source].errors).to be_empty
+    end
+
     it "renders changed template sources immediately" do
       theme = { "template_article" => "Before {{ title }}" }
       expect(described_class.render("article", { "title" => "edit" }, theme: theme)).to eq(
