@@ -300,8 +300,9 @@ public visibility is still checked on every request, including for signed-in rea
 
 The reader loads only the revision and discussion topic for article cards. About
 Markdown is cooked lazily when a Liquid template actually accesses `site.about_html`.
-Parsed Liquid templates are cached by source in a bounded process-local cache, with
-serialized access to each template and a fresh rendering context for every render.
+Parsed Liquid templates are cached by source in a bounded process-local cache. Each render
+uses a shallow copy of the cached template and a fresh rendering context, so concurrent
+renders share only the immutable parse tree.
 Template edits use a different cache entry immediately. This does not cache page
 responses or change withdrawal, preview, or browser-cache behavior.
 

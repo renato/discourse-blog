@@ -161,7 +161,7 @@ module ::DiscourseBlog
       values = {
         "title" => article.title,
         "url" => blog_url(publication.path),
-        "excerpt" => publication.display_excerpt,
+        "excerpt" => article.display_excerpt,
         "standfirst" => article.data["excerpt"].presence,
         "author" => article.data["author_name"],
         "published_at" => date&.iso8601,

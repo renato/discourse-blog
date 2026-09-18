@@ -8,6 +8,7 @@ module ::DiscourseBlog
     PAGES = %w[layout index article about not_found].freeze
     MAX_TEMPLATE_BYTES = 65_536
     TEMPLATE_ROOT = File.expand_path("../../templates", __dir__)
+    TEMPLATES = LruRedux::ThreadSafeCache.new(100)
 
     # Only server-produced fragments may bypass variable escaping.
     class Html < String
@@ -108,13 +109,9 @@ module ::DiscourseBlog
     private_class_method :parse
 
     def self.render_source(source, assigns, strict_variables: false)
-      @templates ||= LruRedux::ThreadSafeCache.new(100)
-      template, mutex = @templates.getset(source) { [parse(source), Mutex.new] }
-      mutex.synchronize { render_template(template, assigns, strict_variables: strict_variables) }
-    end
-    private_class_method :render_source
-
-    def self.render_template(template, assigns, strict_variables: false)
+      # Rendering writes error state onto the template object, so each render gets a shallow
+      # copy that shares the immutable parse tree.
+      template = TEMPLATES.getset(source) { parse(source) }.dup
       context = Context.build(environment: ENVIRONMENT, environments: assigns, rethrow_errors: true)
       template.render!(
         context,
@@ -123,6 +120,6 @@ module ::DiscourseBlog
         global_filter: ->(value) { value.is_a?(Html) ? value : ERB::Util.html_escape(value.to_s) },
       )
     end
-    private_class_method :render_template
+    private_class_method :render_source
   end
 end

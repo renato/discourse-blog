@@ -324,7 +324,7 @@ RSpec.describe "Blog publication", type: :request do
       )
     end
 
-    it "shares article summaries across readers without retaining withdrawn articles" do
+    it "renders identical public cards for every reader and withdraws hidden articles immediately" do
       get "https://blog.example.com/"
       expect(response.status).to eq(200)
       anonymous_cards = Nokogiri.HTML5(response.body).css(".blog-card").to_html
