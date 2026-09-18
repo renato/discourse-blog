@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "liquid"
+require "lru_redux"
 
 module ::DiscourseBlog
   class TemplateRenderer
@@ -107,14 +108,21 @@ module ::DiscourseBlog
     private_class_method :parse
 
     def self.render_source(source, assigns, strict_variables: false)
+      @templates ||= LruRedux::ThreadSafeCache.new(100)
+      template, mutex = @templates.getset(source) { [parse(source), Mutex.new] }
+      mutex.synchronize { render_template(template, assigns, strict_variables: strict_variables) }
+    end
+    private_class_method :render_source
+
+    def self.render_template(template, assigns, strict_variables: false)
       context = Context.build(environment: ENVIRONMENT, environments: assigns, rethrow_errors: true)
-      parse(source).render!(
+      template.render!(
         context,
         strict_filters: true,
         strict_variables: strict_variables,
         global_filter: ->(value) { value.is_a?(Html) ? value : ERB::Util.html_escape(value.to_s) },
       )
     end
-    private_class_method :render_source
+    private_class_method :render_template
   end
 end

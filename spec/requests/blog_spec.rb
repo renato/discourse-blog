@@ -324,6 +324,23 @@ RSpec.describe "Blog publication", type: :request do
       )
     end
 
+    it "shares article summaries across readers without retaining withdrawn articles" do
+      get "https://blog.example.com/"
+      expect(response.status).to eq(200)
+      anonymous_cards = Nokogiri.HTML5(response.body).css(".blog-card").to_html
+
+      sign_in(admin)
+      get "https://blog.example.com/"
+      expect(response.status).to eq(200)
+      expect(Nokogiri.HTML5(response.body).css(".blog-card").to_html).to eq(anonymous_cards)
+
+      publication.discussion_topic.first_post.update!(hidden: true)
+      get "https://blog.example.com/"
+      expect(response.body).not_to include(publication.url)
+      get publication.url
+      expect(response.status).to eq(404)
+    end
+
     it "withdraws all public surfaces immediately when the category becomes private" do
       publication.discussion_topic.update!(category: drafts)
       get "https://blog.example.com#{publication.path}"

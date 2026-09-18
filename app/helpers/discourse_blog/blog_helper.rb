@@ -102,12 +102,13 @@ module ::DiscourseBlog
           "feed_url" => blog_url("/feed.xml"),
           "community_url" => Discourse.base_url,
           "editor_url" => "#{Discourse.base_url}/blog/editor",
-          "about_html" =>
+          "about_html" => -> do
             TemplateRenderer::Html.new(
               PrettyText.cook(
                 SiteSetting.discourse_blog_about.presence || SiteSetting.discourse_blog_description,
               ),
-            ),
+            )
+          end,
         },
         "page" => {
           "title" => @page_title,

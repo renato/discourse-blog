@@ -291,6 +291,20 @@ as described in [Editorial workflow internals](docs/editorial-workflow.md).
 - Discourse authentication remains on Discuss. No API key is exposed to the blog
   browser and cookies are not broadened to the parent domain.
 
+## Reader rendering performance
+
+Published revisions store reading time and the display excerpt alongside their frozen
+content. Older revisions derive these values through Discourse's shared cache without
+rewriting the publication snapshot. These values are independent of reader identity;
+public visibility is still checked on every request, including for signed-in readers.
+
+The reader loads only the revision and discussion topic for article cards. About
+Markdown is cooked lazily when a Liquid template actually accesses `site.about_html`.
+Parsed Liquid templates are cached by source in a bounded process-local cache, with
+serialized access to each template and a fresh rendering context for every render.
+Template edits use a different cache entry immediately. This does not cache page
+responses or change withdrawal, preview, or browser-cache behavior.
+
 ## Rendering and discussion scope
 
 Ordinary cooked Markdown/HTML, images, links, tables, quotes, code blocks, native
