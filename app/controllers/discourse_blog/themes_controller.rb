@@ -25,6 +25,7 @@ module ::DiscourseBlog
       @topic = @publication&.discussion_topic
       @page = 1
       sample = view_context.blog_template_assigns
+      sample["site"]["about_html"] = sample["site"]["about_html"].call
       sample["article"] ||= {
         "title" => I18n.t("discourse_blog.themes.sample_article"),
         "url" => "#{Configuration.origin}/example",

@@ -52,6 +52,7 @@ RSpec.describe "Blog theme authoring", type: :request do
     expect(data["templates"]["template_layout"]).to include("{{ content_html }}")
     expect(data["articles"].map { |article| article["id"] }).to eq([publication.id])
     expect(data.dig("variables", "article", "title")).to eq(publication.article.title)
+    expect(data.dig("variables", "site", "about_html")).to include("<p>")
     expect(response.body).not_to include(private_post.raw, private_topic.title)
     get "https://blog.example.com/blog/theme-authoring.json"
     expect(response.status).to eq(404)
