@@ -46,6 +46,66 @@ RSpec.describe DiscourseBlog::TemplateRenderer do
       end
     end
 
+    it "isolates assignments, counters, and strict-variable errors between renders" do
+      theme = {
+        "template_article" =>
+          "{% if title %}{% assign previous = title %}{% endif %}{{ previous }}:{% increment counter %}:{{ title }}",
+      }
+      expect(described_class.render("article", { "title" => "First" }, theme: theme)).to eq(
+        "First:0:First",
+      )
+      expect(described_class.render("article", {}, theme: theme)).to eq(":0:")
+      expect(described_class.render("article", {}, theme: theme, diagnostics: true)).to include(
+        "data-template-diagnostic",
+      )
+      expect(described_class.render("article", { "title" => "Second" }, theme: theme)).to eq(
+        "Second:0:Second",
+      )
+    end
+
+    it "isolates concurrent renders of the same cached template" do
+      theme = {
+        "template_article" =>
+          "{% assign saved = title %}{% increment counter %}:{{ saved }}:{{ title }}",
+      }
+      ready = Queue.new
+      start = Queue.new
+      threads =
+        4.times.map do |index|
+          Thread.new do
+            ready << true
+            start.pop
+            5.times.map do
+              described_class.render("article", { "title" => "Reader #{index}" }, theme: theme)
+            end
+          end
+        end
+      4.times { ready.pop }
+      4.times { start << true }
+
+      threads.each_with_index do |thread, index|
+        expect(thread.value).to eq(["0:Reader #{index}:Reader #{index}"] * 5)
+      end
+    end
+
+    it "resets resource limits after a cached template fails" do
+      theme = { "template_about" => "{% for item in (1..count) %}x{% endfor %}" }
+      assigns = { "count" => 100_000, "site" => {}, "labels" => { "about" => "Fallback" } }
+      expect(described_class.render("about", assigns, theme: theme)).to include("Fallback")
+      expect(described_class.render("about", { "count" => 2 }, theme: theme)).to eq("xx")
+    end
+
+    it "renders changed template sources immediately" do
+      theme = { "template_article" => "Before {{ title }}" }
+      expect(described_class.render("article", { "title" => "edit" }, theme: theme)).to eq(
+        "Before edit",
+      )
+      theme["template_article"] = "After {{ title }}"
+      expect(described_class.render("article", { "title" => "edit" }, theme: theme)).to eq(
+        "After edit",
+      )
+    end
+
     it "ignores custom templates when custom rendering is disabled" do
       output =
         described_class.render(

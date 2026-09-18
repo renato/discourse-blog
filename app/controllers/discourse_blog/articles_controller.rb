@@ -46,7 +46,7 @@ module ::DiscourseBlog
           .newest
           .offset((@page - 1) * limit)
           .limit(limit + 1)
-          .includes(:published_revision, discussion_topic: %i[first_post user image_upload tags])
+          .includes(:published_revision, :discussion_topic)
           .to_a
       @more = selected.size > limit
       @publications = selected.first(limit)
@@ -70,7 +70,7 @@ module ::DiscourseBlog
       @publication =
         Publication
           .publicly_visible
-          .includes(:published_revision, discussion_topic: %i[first_post user image_upload tags])
+          .includes(:published_revision, :discussion_topic)
           .find(stored_path.publication_id)
       if @publication.path != request.path
         return(redirect_to(@publication.url, status: :moved_permanently, allow_other_host: true))

@@ -15,7 +15,7 @@ module ::DiscourseBlog
       post = source.first_post
       metadata = publication.editorial_metadata
       upload = source.image_upload
-      metadata.merge(
+      metadata.merge(summary(post.cooked.to_s, metadata["excerpt"])).merge(
         "title" => source.title,
         "raw" => post.raw,
         "cooked" => post.cooked,
@@ -23,6 +23,17 @@ module ::DiscourseBlog
         "image_url" => upload && !upload.secure? ? upload.url : "",
         "tags" => source.tags.visible(Guardian.new).pluck(:name),
       )
+    end
+
+    def self.summary(cooked, excerpt)
+      {
+        "reading_minutes" => [
+          (PrettyText.excerpt(cooked, 100_000, strip_tags: true).split.size / 220.0).ceil,
+          1,
+        ].max,
+        "display_excerpt" =>
+          excerpt.presence || PrettyText.excerpt(cooked, 240, strip_links: true, strip_tags: true),
+      }
     end
 
     def title
@@ -34,7 +45,11 @@ module ::DiscourseBlog
     end
 
     def reading_minutes
-      [(PrettyText.excerpt(cooked.to_s, 100_000, strip_tags: true).split.size / 220.0).ceil, 1].max
+      summary["reading_minutes"]
+    end
+
+    def display_excerpt
+      summary["display_excerpt"]
     end
 
     def raw
@@ -42,6 +57,21 @@ module ::DiscourseBlog
     end
 
     private
+
+    def summary
+      @summary ||=
+        if data.key?("reading_minutes") && data.key?("display_excerpt")
+          data.slice("reading_minutes", "display_excerpt")
+        elsif persisted?
+          Discourse
+            .cache
+            .fetch("discourse-blog:revision-summary:v1:#{cache_key_with_version}") do
+              self.class.summary(cooked.to_s, data["excerpt"])
+            end
+        else
+          self.class.summary(cooked.to_s, data["excerpt"])
+        end
+    end
 
     def retain_uploads
       UploadReference.ensure_exist!(upload_ids: Upload.extract_upload_ids(raw), target: self)

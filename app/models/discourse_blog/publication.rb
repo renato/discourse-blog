@@ -137,8 +137,7 @@ module ::DiscourseBlog
     end
 
     def display_excerpt
-      article.data["excerpt"].presence ||
-        PrettyText.excerpt(article.cooked.to_s, 240, strip_links: true, strip_tags: true)
+      article.display_excerpt
     end
 
     def article_updated_at
