@@ -2,6 +2,8 @@
 
 module ::DiscourseBlog
   class Review < ActiveRecord::Base
+    include HasPostUploadReferences
+
     self.table_name = "discourse_blog_reviews"
     # TODO(03-2027): Remove once the post-deploy column drop has been promoted.
     self.ignored_columns += %i[token_digest]
@@ -10,6 +12,10 @@ module ::DiscourseBlog
     belongs_to :topic
     belongs_to :creator, class_name: "User"
     has_many :feedback, class_name: "DiscourseBlog::ReviewFeedback", dependent: :delete_all
+    has_many :upload_references, as: :target, dependent: :destroy
+
+    after_create :link_post_uploads
+    after_update :release_uploads, if: -> { saved_change_to_revoked_at? && revoked_at? }
 
     validates :label, length: { maximum: 100 }
     validates :title, :cooked, :post_version, :expires_at, presence: true
@@ -109,7 +115,15 @@ module ::DiscourseBlog
     end
 
     def self.revoke_for_topic!(topic_id)
-      where(topic_id: topic_id, revoked_at: nil).update_all(revoked_at: Time.current)
+      transaction do
+        where(topic_id: topic_id, revoked_at: nil).update_all(revoked_at: Time.current)
+        UploadReference.where(target: where(topic_id: topic_id)).delete_all
+      end
+    end
+
+    def self.release_inactive_uploads!
+      inactive = where.not(revoked_at: nil).or(where("expires_at <= ?", Time.current))
+      UploadReference.where(target: inactive).delete_all
     end
 
     def self.snapshot_html(post)
@@ -122,6 +136,12 @@ module ::DiscourseBlog
       html
     end
     private_class_method :snapshot_html
+
+    private
+
+    def release_uploads
+      upload_references.delete_all
+    end
   end
 end
 

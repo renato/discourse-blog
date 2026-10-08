@@ -42,6 +42,24 @@ RSpec.describe "Blog publication", type: :request do
       expect(response.status).to eq(403)
     end
 
+    it "reports anonymous upload restrictions without exposing the public blog" do
+      publication = DiscourseBlog::Publication.for_topic(topic)
+      publication.publish!(admin)
+      SiteSetting.prevent_anons_from_downloading_files = true
+
+      get "https://blog.example.com#{publication.path}"
+      expect(response.status).to eq(404)
+      expect(publication.reload).not_to be_publicly_visible
+
+      get "https://test.localhost/session/#{admin.encoded_username}/become"
+      get "https://test.localhost/blog/editor.json"
+      expect(response.status).to eq(200)
+      expect(response.parsed_body["error"]).to eq(I18n.t("discourse_blog.errors.anonymous_uploads"))
+
+      post "https://test.localhost/blog/publications/#{topic.id}/publish.json"
+      expect(response.status).to eq(400)
+    end
+
     it "lists only editorial topics" do
       Fabricate(:topic)
       sign_in(admin)

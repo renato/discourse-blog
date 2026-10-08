@@ -32,7 +32,7 @@ module ::DiscourseBlog
 
     def self.public_enabled?
       SiteSetting.discourse_blog_enabled && configured_origin? && !SiteSetting.login_required &&
-        !SiteSetting.secure_uploads
+        !SiteSetting.secure_uploads && !SiteSetting.prevent_anons_from_downloading_files
     end
 
     def self.error
@@ -41,6 +41,9 @@ module ::DiscourseBlog
       end
       if SiteSetting.login_required || SiteSetting.secure_uploads
         return I18n.t("discourse_blog.errors.private_site")
+      end
+      if SiteSetting.prevent_anons_from_downloading_files
+        return I18n.t("discourse_blog.errors.anonymous_uploads")
       end
       category = Category.find_by(id: SiteSetting.discourse_blog_category)
       drafts = Category.find_by(id: SiteSetting.discourse_blog_drafts_category)

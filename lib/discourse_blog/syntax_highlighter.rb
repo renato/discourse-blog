@@ -3,7 +3,7 @@
 module ::DiscourseBlog
   module SyntaxHighlighter
     def self.source
-      @source ||= File.read(File.join(HighlightJs::HIGHLIGHTJS_DIR, "es/core.min.js"))
+      @source ||= File.read(File.expand_path("../../vendor/highlightjs/core.min.js", __dir__))
     end
 
     def self.version

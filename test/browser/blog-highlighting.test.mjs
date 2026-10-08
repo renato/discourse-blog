@@ -11,7 +11,10 @@ const assets = new URL(
   "../../../../frontend/discourse/node_modules/@highlightjs/cdn-assets/",
   import.meta.url
 );
-const core = readFileSync(new URL("es/core.min.js", assets), "utf8");
+const core = readFileSync(
+  new URL("../../vendor/highlightjs/core.min.js", import.meta.url),
+  "utf8"
+);
 const languages = `export default function(hljs) {${["ruby", "javascript"]
   .map((language) =>
     readFileSync(new URL(`languages/${language}.min.js`, assets), "utf8")

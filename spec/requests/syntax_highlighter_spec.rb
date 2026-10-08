@@ -1,14 +1,22 @@
 # frozen_string_literal: true
 
 RSpec.describe "Blog syntax highlighter", type: :request do
-  before { enable_discourse_blog! }
+  before do
+    enable_discourse_blog!
+    DiscourseBlog::SyntaxHighlighter.instance_variable_set(:@source, nil)
+  end
+
+  around do |example|
+    stub_const(VendoredAssets, :DIRECTORY, "tmp/missing-blog-runtime-assets") { example.run }
+  end
 
   it "serves the minified module with immutable caching and CORS for previews" do
     get "https://blog.example.com#{DiscourseBlog::SyntaxHighlighter.path}"
 
     expect(response.status).to eq(200)
     expect(response.media_type).to eq("application/javascript")
-    expect(response.body).to eq(DiscourseBlog::SyntaxHighlighter.source)
+    packaged_source = File.read(File.expand_path("../../vendor/highlightjs/core.min.js", __dir__))
+    expect(response.body).to eq(packaged_source)
     expect(response.headers["Cache-Control"]).to include("immutable", "public")
     expect(response.headers["Access-Control-Allow-Origin"]).to eq("*")
     expect(response.headers["Set-Cookie"]).to be_nil

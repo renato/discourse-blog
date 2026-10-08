@@ -284,7 +284,8 @@ as described in [Editorial workflow internals](docs/editorial-workflow.md).
   be recalled.
 - Preview is authenticated on Discuss, `noindex` and `no-store`; it does not change
   Guardian permissions or enable anonymous share tokens.
-- **Secure uploads and login-required sites are unsupported in this version.**
+- **Secure uploads, login-required sites, and sites that prohibit anonymous file
+  downloads are unsupported in this version.**
   Draft text is private, but upload URLs are not access-controlled when secure
   uploads are disabled. Do not put confidential attachments into these drafts.
   Supporting private draft media needs an explicit media-publication design.
@@ -356,9 +357,19 @@ iteration.
 ```sh
 bin/rake db:migrate
 RAILS_ENV=test bin/rake db:migrate
-bin/rspec plugins/discourse-blog/spec/requests/
-bin/qunit plugins/discourse-blog/test/javascripts/acceptance/
+bin/rspec plugins/discourse-blog/spec/
+bin/qunit --target discourse-blog
+pnpm exec playwright install chromium --only-shell
+node --test plugins/discourse-blog/test/browser/*.test.mjs
 ```
+
+The browser tests require the Chromium headless shell matching the installed
+Playwright version. Re-run the install command after updating Playwright.
+The reader's syntax-highlighting module and its license are packaged in
+`vendor/highlightjs/` inside the plugin, so production does not require
+`node_modules` or a modified core asset-copy script. The browser tests exercise
+that packaged module against core's language registrations. See
+[`vendor/highlightjs/README.md`](vendor/highlightjs/README.md) when updating it.
 
 The plugin includes standalone lint configuration. Pass its source files explicitly
 to `bin/lint --fix`; do not include `node_modules`. Core's structure/annotation tasks
@@ -366,6 +377,24 @@ only include bundled plugins, so this external plugin's schema is carried by its
 own migration rather than changes to core's `db/structure.sql`.
 
 See [design notes](docs/design.md) and [live verification](docs/live-verification.md).
+
+### Runtime lifecycle safeguards
+
+The plugin packages its reader highlighter independently of core runtime assets.
+Regression request tests run without core's vendored asset directory, and browser
+tests use the packaged module rather than a development dependency copy.
+
+Review snapshots retain upload references independently of the working draft.
+Revocation and hard deletion release those references immediately; an hourly job
+releases references for expired reviews, even when the blog is disabled. The
+upgrade migration backfills original, optimized, and short-URL upload references for
+existing active snapshots. Run migrations before enabling upload cleanup after an upgrade.
+Already-deleted uploads cannot be recovered by the migration.
+
+Sites with `prevent_anons_from_downloading_files` enabled are unsupported, alongside
+login-required sites and secure uploads. Public blog and review requests fail
+closed, publication/review creation is blocked, and the editorial dashboard shows
+an actionable configuration error. The plugin never bypasses upload permissions.
 
 ### Sample conversations
 

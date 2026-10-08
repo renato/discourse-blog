@@ -28,6 +28,18 @@ RSpec.describe "External draft review", type: :request do
     [review, Rack::Utils.parse_query(URI(review["url"]).query)["review_token"]]
   end
 
+  it "rejects account-free reviews when anonymous upload downloads are disabled" do
+    review, token = issue_review
+    SiteSetting.prevent_anons_from_downloading_files = true
+
+    get "https://blog.example.com/review.json", params: { review_token: token }
+    expect(response.status).to eq(404)
+
+    post "https://test.localhost/blog/publications/#{topic.id}/reviews.json"
+    expect(response.status).to eq(400)
+    expect(DiscourseBlog::Review.where(topic: topic).pluck(:id)).to eq([review["id"]])
+  end
+
   it "requires an authorized editor and keeps issued links readable by editors" do
     post "/blog/publications/#{topic.id}/reviews.json"
     expect(response.status).to eq(403)
@@ -213,6 +225,7 @@ RSpec.describe "External draft review", type: :request do
     expect(response.status).to eq(403)
     expect(DiscourseBlog::ReviewFeedback.count).to eq(0)
   end
+
   it "requires a real CSRF token for anonymous feedback" do
     _, token = issue_review
     previous = DiscourseBlog::ReviewReaderController.allow_forgery_protection

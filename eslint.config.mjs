@@ -1,3 +1,3 @@
 import DiscourseRecommended from "@discourse/lint-configs/eslint";
 
-export default [...DiscourseRecommended];
+export default [{ ignores: ["vendor/**"] }, ...DiscourseRecommended];
