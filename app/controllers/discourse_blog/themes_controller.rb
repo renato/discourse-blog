@@ -47,6 +47,7 @@ module ::DiscourseBlog
         "tags" => [],
       }
       render json: {
+               template_engine: GlimmerRenderer.enabled? ? "glimmer" : "liquid",
                templates:
                  TemplateRenderer::PAGES.to_h { |page|
                    ["template_#{page}", TemplateRenderer.builtin(page)]

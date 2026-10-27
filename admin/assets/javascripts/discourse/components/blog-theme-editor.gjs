@@ -130,6 +130,7 @@ export default class BlogThemeEditor extends Component {
 
   get variables() {
     const rows = [];
+    const glimmer = this.catalog?.template_engine === "glimmer";
     const visit = (object, prefix = "") => {
       for (const [key, value] of Object.entries(object || {})) {
         if (
@@ -145,7 +146,9 @@ export default class BlogThemeEditor extends Component {
             path,
             type: i18n("discourse_blog.admin.array_value"),
             example: JSON.stringify(value).slice(0, 350),
-            snippet: `{% for item in ${path} %}{{ item.${key === "tags" ? "name" : "title"} }}{% endfor %}`,
+            snippet: glimmer
+              ? `{{#each @${path} as |item|}}{{item.${key === "tags" ? "name" : "title"}}}{{/each}}`
+              : `{% for item in ${path} %}{{ item.${key === "tags" ? "name" : "title"} }}{% endfor %}`,
           });
         } else if (value && typeof value === "object") {
           visit(value, path);
@@ -156,7 +159,7 @@ export default class BlogThemeEditor extends Component {
               ? i18n("discourse_blog.admin.trusted_html")
               : i18n("discourse_blog.admin.escaped_text"),
             example: String(value ?? "").slice(0, 350),
-            snippet: `{{ ${path} }}`,
+            snippet: `{{ ${glimmer ? "@" : ""}${path} }}`,
           });
         }
       }
@@ -173,7 +176,7 @@ export default class BlogThemeEditor extends Component {
       path: "content_html",
       type: i18n("discourse_blog.admin.trusted_html"),
       example: i18n("discourse_blog.admin.layout_content"),
-      snippet: "{{ content_html }}",
+      snippet: glimmer ? "{{ @content_html }}" : "{{ content_html }}",
     });
     return rows.filter((row) =>
       row.path.toLowerCase().includes(this.variableQuery.toLowerCase())

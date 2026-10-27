@@ -93,13 +93,17 @@ module ::DiscourseBlog
       unless manifest.is_a?(Hash) && [1, 2].include?(manifest["version"])
         raise Discourse::InvalidParameters.new(I18n.t("discourse_blog.themes.manifest_invalid"))
       end
+      expected = GlimmerRenderer.enabled? ? "glimmer" : "liquid"
+      if manifest.fetch("template_engine", "liquid") != expected
+        raise Discourse::InvalidParameters.new(I18n.t("discourse_blog.themes.manifest_invalid"))
+      end
       values = manifest.slice("name", "accent_color", "paper_color", "ink_color")
       values["css"] = yield("blog.css", BlogTheme::MAX_CODE_BYTES)
       values["javascript"] = yield("blog.js", BlogTheme::MAX_CODE_BYTES)
       if manifest["version"] == 2
         TemplateRenderer::PAGES.each do |page|
           values["template_#{page}"] = yield(
-            "templates/#{page}.liquid",
+            "templates/#{page}.#{GlimmerRenderer.enabled? ? "hbs" : "liquid"}",
             TemplateRenderer::MAX_TEMPLATE_BYTES
           )
         end

@@ -44,7 +44,7 @@ en:
         trusted_html: Trusted HTML
         escaped_text: Escaped value
         layout_content: The rendered page and discussion. Use once inside the layout’s main element.
-        insert_hint: Examples use public content only. Insert appends the Liquid snippet to this template. Ordinary values are escaped; trusted HTML fragments render as markup.
+        insert_hint: Examples use public content only. Insert appends the template snippet to this template. Ordinary values are escaped; trusted HTML fragments render as markup.
         retry_reference: Reload authoring reference
         working_preview_hint: Preview your unsaved changes without saving or activating them. Changing the page or sample article updates the preview.
         preview_article_unavailable: Article previews need a published article.

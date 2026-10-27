@@ -215,6 +215,45 @@ acceptance("Blog themes and identity", function (needs) {
       .isNotDisabled("the saved template can be previewed before activation");
   });
 
+  test("inserts Glimmer argument and loop snippets in the existing editor", async function (assert) {
+    let saved;
+    pretender.put("/blog/themes/candidate.json", (request) => {
+      saved = new URLSearchParams(request.requestBody).get(
+        "theme[template_layout]"
+      );
+      return response({ ...draft, revision: 2, template_layout: saved });
+    });
+    pretender.get("/blog/theme-authoring.json", () =>
+      response({
+        template_engine: "glimmer",
+        templates: { template_layout: "<main>{{@content_html}}</main>" },
+        articles: [],
+        variables: { site: { title: "Example" }, articles: [] },
+      })
+    );
+    await visit("/admin/plugins/discourse-blog/themes/candidate/edit");
+    await click('[data-authoring-tab="template_layout"]');
+    await click(".blog-theme-editor__customize");
+    await click(".blog-theme-editor__variables");
+    await fillControl('input[aria-label="Find a variable"]', "site.title");
+    await click(".blog-theme-variables__insert");
+    assert
+      .dom('[data-name="template_layout"] .ace_content')
+      .includesText("@site.title", "inserts an argument reference");
+    await click(".blog-theme-editor__variables");
+    await fillControl('input[aria-label="Find a variable"]', "articles");
+    await click(".blog-theme-variables__insert");
+    await formKit(".blog-theme-editor__form").submit();
+    assert.true(
+      saved.includes("#each @articles"),
+      "saves the inserted Glimmer loop"
+    );
+    assert.true(
+      saved.includes("@site.title"),
+      "preserves the inserted argument reference"
+    );
+  });
+
   test("customizes one effective template, inserts a variable, and restores its default", async function (assert) {
     await visit("/admin/plugins/discourse-blog/themes/candidate/edit");
     await click('[data-authoring-tab="template_layout"]');

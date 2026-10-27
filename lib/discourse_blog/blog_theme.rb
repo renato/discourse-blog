@@ -15,6 +15,10 @@ module ::DiscourseBlog
       "ink_color" => "19382d",
     }.freeze
 
+    def self.store
+      GlimmerRenderer.enabled? ? "#{STORE}-glimmer-poc" : STORE
+    end
+
     def self.defaults
       {
         "name" => I18n.t("discourse_blog.themes.current"),
@@ -26,27 +30,28 @@ module ::DiscourseBlog
 
     def self.all
       PluginStoreRow
-        .where(plugin_name: STORE)
+        .where(plugin_name: store)
         .where("key LIKE 'theme:%'")
         .order(:id)
         .map { |row| PluginStore.cast_value(row.type_name, row.value) }
     end
 
     def self.find(id)
-      PluginStore.get(STORE, "theme:#{id}") || raise(Discourse::NotFound)
+      PluginStore.get(store, "theme:#{id}") || raise(Discourse::NotFound)
     end
 
     def self.active
-      PluginStore.get(STORE, "active") || defaults
+      PluginStore.get(store, "active") || defaults
     end
 
     def self.snapshot(id)
-      PluginStore.get(STORE, "snapshot:#{id}") || raise(Discourse::NotFound)
+      PluginStore.get(store, "snapshot:#{id}") || raise(Discourse::NotFound)
     end
 
     def self.save(attributes, user:, id: nil, revision: nil, source: nil)
       values = TEMPLATE_FIELDS.to_h { |field| [field, ""] }.merge(attributes.slice(*FIELDS))
-      validate!(values)
+      compiled = validate!(values)
+      values["glimmer"] = compiled if GlimmerRenderer.enabled?
       mutate do
         previous = id ? find(id) : nil
         check_revision!(previous, revision) if previous
@@ -60,7 +65,7 @@ module ::DiscourseBlog
             "source" => source || previous&.dig("source"),
             "locally_modified" => source.nil? && previous&.dig("source").present?,
           )
-        PluginStore.set(STORE, "theme:#{theme["id"]}", theme)
+        PluginStore.set(store, "theme:#{theme["id"]}", theme)
         audit(user, "save", theme)
         theme
       end
@@ -72,10 +77,10 @@ module ::DiscourseBlog
         check_revision!(theme, revision)
         # Readers use a copy, never the mutable editor or Git source.
         theme = theme.merge("snapshot" => SecureRandom.uuid)
-        PluginStore.set(STORE, "snapshot:#{theme["snapshot"]}", theme)
-        PluginStore.set(STORE, "active", theme)
+        PluginStore.set(store, "snapshot:#{theme["snapshot"]}", theme)
+        PluginStore.set(store, "active", theme)
         PluginStoreRow
-          .where(plugin_name: STORE)
+          .where(plugin_name: store)
           .where("key LIKE 'snapshot:%'")
           .order(id: :desc)
           .offset(20)
@@ -92,7 +97,7 @@ module ::DiscourseBlog
         if active["id"] == id
           raise Discourse::InvalidParameters.new(I18n.t("discourse_blog.themes.active_delete"))
         end
-        PluginStore.remove(STORE, "theme:#{id}")
+        PluginStore.remove(store, "theme:#{id}")
         audit(user, "delete", theme)
       end
     end
@@ -119,12 +124,16 @@ module ::DiscourseBlog
 
     def self.working_preview(attributes, user:)
       values = TEMPLATE_FIELDS.to_h { |field| [field, ""] }.merge(attributes.slice(*FIELDS))
-      # Keep ordinary validation, but allow syntax errors to be inspected in the preview.
-      validate!(values.merge(TEMPLATE_FIELDS.to_h { |field| [field, ""] }))
-      TEMPLATE_FIELDS.each do |field|
-        unless values[field].is_a?(String) && values[field].valid_encoding? &&
-                 values[field].bytesize <= TemplateRenderer::MAX_TEMPLATE_BYTES
-          raise Discourse::InvalidParameters.new(I18n.t("discourse_blog.themes.template_invalid"))
+      if GlimmerRenderer.enabled?
+        values["glimmer"] = validate!(values)
+      else
+        # Keep ordinary validation, but allow syntax errors to be inspected in the preview.
+        validate!(values.merge(TEMPLATE_FIELDS.to_h { |field| [field, ""] }))
+        TEMPLATE_FIELDS.each do |field|
+          unless values[field].is_a?(String) && values[field].valid_encoding? &&
+                   values[field].bytesize <= TemplateRenderer::MAX_TEMPLATE_BYTES
+            raise Discourse::InvalidParameters.new(I18n.t("discourse_blog.themes.template_invalid"))
+          end
         end
       end
       key = SecureRandom.hex(32)
@@ -155,6 +164,7 @@ module ::DiscourseBlog
           values[field].valid_encoding? && values[field].bytesize <= MAX_CODE_BYTES
         end
       raise Discourse::InvalidParameters.new(I18n.t("discourse_blog.themes.invalid")) unless valid
+      return GlimmerRenderer.compile_theme(values) if GlimmerRenderer.enabled?
       TEMPLATE_FIELDS.each do |field|
         TemplateRenderer.validate!(values[field], page: field.delete_prefix("template_"))
       end

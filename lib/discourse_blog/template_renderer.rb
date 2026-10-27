@@ -67,6 +67,9 @@ module ::DiscourseBlog
 
     def self.render(page, assigns, theme:, custom: true, diagnostics: false)
       raise ArgumentError if PAGES.exclude?(page)
+      if GlimmerRenderer.enabled?
+        return GlimmerRenderer.render(page, assigns, theme: theme, custom: custom)
+      end
       override = custom && theme["template_#{page}"].presence
       source = override || builtin(page)
       if diagnostics
@@ -98,6 +101,7 @@ module ::DiscourseBlog
 
     def self.builtin(page)
       raise ArgumentError if PAGES.exclude?(page)
+      return GlimmerRenderer.builtin(page) if GlimmerRenderer.enabled?
       File.read(File.join(TEMPLATE_ROOT, "#{page}.liquid"))
     end
 

@@ -8,13 +8,17 @@ module ::DiscourseBlog
       files = {
         "blog-theme.json" =>
           JSON.pretty_generate(
-            theme.slice("name", "accent_color", "paper_color", "ink_color").merge("version" => 2),
+            theme.slice("name", "accent_color", "paper_color", "ink_color").merge(
+              "version" => 2,
+              "template_engine" => GlimmerRenderer.enabled? ? "glimmer" : "liquid",
+            ),
           ),
         "blog.css" => theme["css"],
         "blog.js" => theme["javascript"],
       }
       TemplateRenderer::PAGES.each do |page|
-        files["templates/#{page}.liquid"] = theme["template_#{page}"]
+        extension = GlimmerRenderer.enabled? ? "hbs" : "liquid"
+        files["templates/#{page}.#{extension}"] = theme["template_#{page}"]
       end
 
       Zip::OutputStream
